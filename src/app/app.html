@@ -1,72 +1,5 @@
 <f-flow fDraggable>
-  <f-canvas>
-    <!-- <f-connection
-      fOutputId="output1"
-      fInputId="input2"
-      fBehavior="fixed_center"
-      [fReassignDisabled]="true"
-      fType="straight"
-    >
-    </f-connection>
-
-    <div
-      fNode
-      fDragHandle
-      fNodeOutput
-      [fNodePosition]="{ x: 500, y: 32 }"
-      fOutputId="output1"
-      fOutputConnectableSide="bottom"
-      class="border-red-100"
-    >
-      <form action="" [formGroup]="formBuilder" class="flex gap-3">
-        <input
-          formControlName="title"
-          class="border border-r-2 rounded-lg p-2"
-        />
-        <button type="button" (click)="clearData()">Clear</button>
-      </form>
-    </div>
-
-    <div
-      fNode
-      fDragHandle
-      fNodeInput
-      [fNodePosition]="{ x: 600, y: 200 }"
-      fInputId="input2"
-      fInputConnectableSide="left"
-    >
-      Node 2
-    </div>
-
-    <f-connection
-      fOutputId="output3"
-      fInputId="input4"
-      fBehavior="fixed_center"
-      fType="segment"
-    >
-    </f-connection>
-
-    <div
-      fNode
-      fDragHandle
-      [fNodePosition]="{ x: 50, y: 50}"
-      fNodeOutput
-      fOutputId="output3"
-      fOutputConnectableSide="right"
-    >
-      123
-    </div>
-    <div
-      fNode
-      fDragHandle
-      [fNodePosition]="{ x: 300, y: 300 }"
-      fNodeInput
-      fInputId="input4"
-      fInputConnectableSide="left"
-    >
-      123
-    </div> -->
-
+  <f-canvas [fZoom]="isZoomEnabled">
     <!-- test this shit -->
     @for(connection of connections(); track connection.id){
     <f-connection
@@ -116,6 +49,7 @@
         >
           <span>+</span>
         </button>
+        @if (!isRootNode(node.connectorId)) {
         <button
           class="node__button-remove"
           (click)="removeNode(node.connectorId); $event.stopPropagation()"
@@ -123,6 +57,7 @@
         >
           <span>-</span>
         </button>
+        }
       </div>
     </div>
 
@@ -130,7 +65,7 @@
   </f-canvas>
 </f-flow>
 
-<div class="absolute top-20 right-20 flex gap-3">
+<div class="absolute top-10 right-10 flex gap-3">
   <button class="f-button bg-slate-400 p-3" (click)="horizontal()">
     Horizontal
   </button>

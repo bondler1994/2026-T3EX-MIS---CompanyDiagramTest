@@ -26,18 +26,20 @@ import Graph = graphlib.Graph;
 import { generateGuid } from '@foblex/utils';
 import { NgClass } from '@angular/common';
 
+// 節點視圖模型介面：定義在 UI 中顯示的節點資料結構
 interface INodeViewModel {
-  id: string;
-  connectorId: string;
-  position: IPoint;
-  title: string;
-  isEditing?: boolean;
+  id: string; // 視覺節點的唯一識別符（用於 Angular 追蹤）
+  connectorId: string; // dagre 圖形庫使用的節點 ID（用於連線邏輯）
+  position: IPoint; // 節點在畫布上的位置座標
+  title: string; // 節點顯示的標題文字
+  isEditing?: boolean; // 是否處於編輯模式（可選屬性）
 }
 
+// 連線視圖模型介面：定義節點之間的連接關係
 interface IConnectionViewModel {
-  id: string;
-  from: string;
-  to: string;
+  id: string; // 連線的唯一識別符
+  from: string; // 起始節點的 connectorId
+  to: string; // 目標節點的 connectorId
 }
 
 @Component({
@@ -55,50 +57,79 @@ interface IConnectionViewModel {
   styleUrl: './app.scss',
 })
 export class App implements OnInit {
+  // 取得 FFlowComponent 的參考（用於呼叫 reset() 等方法）
   _flow = viewChild(FFlowComponent);
+  // 取得 FCanvasComponent 的參考（必要的畫布元件）
   _canvas = viewChild.required(FCanvasComponent);
+  // 儲存所有節點的響應式信號
   nodes = signal<INodeViewModel[]>([]);
+  // 儲存所有連線的響應式信號
   connections = signal<IConnectionViewModel[]>([]);
+  // 當前的佈局配置（連接點位置等）
   configuration = signal(CONFIGURATION[Direction.TOP_TO_BOTTOM]);
+  // 是否啟用自動佈局模式
   isAutoLayout = model(true);
+  // 是否啟用縮放功能
+  isZoomEnabled = true;
 
+  /**
+   * 主要的圖形數據處理方法：負責整合 dagre 佈局計算與 UI 更新
+   * @param graph - dagre 圖形物件
+   * @param direction - 佈局方向（垂直或水平）
+   */
   _getData(graph: Graph, direction: Direction) {
-    // 如果啟用了自動佈局，則在更新圖形之前重置畫布
+    // 如果啟用了自動佈局，則在更新圖形之前重置畫布狀態
     if (this.isAutoLayout()) {
       this._flow()?.reset();
     }
-    // 更新圖形並重新計算節點和連接的位置
+    // 設定 dagre 圖形屬性並執行自動佈局計算
     this._updateGraph(graph, direction);
-    // 將計算出的節點和連接更新到信號中，以觸發 UI 的重新渲染
+    // 將 dagre 計算的結果轉換為 UI 使用的節點資料
     this.nodes.set(this._calculateNodes(graph));
-    // 這裡的 connections 是根據 graph 的邊緣計算出來的，並且每個連接都會有一個唯一的 id，以及 from 和 to 屬性對應到節點的 connectorId
+    // 將 dagre 的邊緣資料轉換為 UI 使用的連線資料
     this.connections.set(this._calculateConnections(graph));
   }
 
+  /**
+   * 更新 dagre 圖形並執行自動佈局計算
+   * @param graph - dagre 圖形物件
+   * @param direction - 佈局方向
+   */
   _updateGraph(graph: Graph, direction: Direction) {
+    // 設定 UI 配置（決定連接點在節點的哪一側）
     this.configuration.set(CONFIGURATION[direction]);
+    // 告訴 dagre 圖形的排列方向（LR=左右，TB=上下）
     graph.setGraph({ rankdir: direction });
+    // 將所有節點資料加入到 dagre 圖形中
     GRAPH_DATA.forEach((node) => {
-      //這裡的 setNode 擷取了 node.id 作為 connectorId，並且設定了預設的寬高
+      // 為每個節點設定 ID 和預設尺寸（寬120px，高73px）
       graph.setNode(node.id, { width: 120, height: 73 });
+      // 如果節點有父節點，建立父子連線關係
       if (node.parentId != null) {
         graph.setEdge(node.parentId, node.id, {});
       }
     });
+    // 執行 dagre 自動佈局演算法，計算最佳節點位置
     dagre.layout(graph);
   }
 
+  /**
+   * 將 dagre 計算的節點資料轉換為 UI 顯示用的節點視圖模型
+   * @param graph - 已經過佈局計算的 dagre 圖形
+   * @returns 節點視圖模型陣列
+   */
   _calculateNodes(graph: Graph) {
     return graph.nodes().map((x) => {
+      // 取得 dagre 計算後的節點位置和尺寸資訊
       const node = graph.node(x);
-      // 從 GRAPH_DATA 中找到對應的節點資料，以便獲取標題等資訊
+      // 從原始資料中找到對應的節點，取得標題等額外資訊
       const graphData = GRAPH_DATA.find((gd) => gd.id === x);
       return {
-        id: generateGuid(),
-        connectorId: x,
-        position: { x: node.x, y: node.y },
-        title: graphData?.title || x, // 使用 GRAPH_DATA 中的標題或 connectorId 作為備用
-        isEditing: false, // 預設不在編輯狀態
+        id: generateGuid(), // 產生唯一的視覺 ID（供 Angular 追蹤）
+        connectorId: x, // dagre 節點 ID（用於連線邏輯）
+        position: { x: node.x, y: node.y }, // dagre 計算的最佳位置
+        title: graphData?.title || x, // 顯示標題（優先使用自訂標題）
+        isEditing: false, // 預設不在編輯模式
       };
     });
   }
@@ -163,8 +194,12 @@ export class App implements OnInit {
     }
   }
 
+  /**
+   * 在指定父節點下新增子節點
+   * @param parentConnectorId - 父節點的 connectorId
+   */
   addChildNode(parentConnectorId: string) {
-    // 產生新節點
+    // 產生新節點的唯一 ID
     const newNodeId = `Node${Date.now()}`;
     const newNode = {
       id: newNodeId,
@@ -172,21 +207,53 @@ export class App implements OnInit {
       title: `New Node ${GRAPH_DATA.length + 1}`,
     };
 
-    // 加入到 GRAPH_DATA
+    // 將新節點加入到原始資料中
     GRAPH_DATA.push(newNode);
 
-    // 保存到 localStorage
+    // 儲存到本地儲存
     this.saveGraphData();
 
-    // 重新計算佈局
+    // 重新計算並顯示新的佈局
     this._getData(new dagre.graphlib.Graph(), this.getCurrentDirection());
   }
 
+  /**
+   * 刪除指定節點及其所有子節點（帶有確認對話框）
+   * @param nodeConnectorId - 要刪除的節點 connectorId
+   */
   removeNode(nodeConnectorId: string) {
-    // 找出該節點和其所有子節點
+    // 檢查節點是否有子分支
+    if (this.hasChildNodes(nodeConnectorId)) {
+      // 計算將被刪除的節點總數
+      const nodesToDelete = this.getNodeAndChildren(nodeConnectorId);
+      const childCount = nodesToDelete.length - 1; // 減去本身節點
+
+      // 顯示警告確認對話框
+      const confirmed = confirm(
+        `警告！此節點下方還有 ${childCount} 個子分支。\n` +
+          `如果繼續刪除，將會同時刪除所有子分支（共 ${nodesToDelete.length} 個節點）。\n\n` +
+          `您確定要繼續刪除嗎？`,
+      );
+
+      // 如果用戶取消，則不執行刪除
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    // 執行刪除邏輯
+    this.performNodeDeletion(nodeConnectorId);
+  }
+
+  /**
+   * 執行實際的節點刪除操作
+   * @param nodeConnectorId - 要刪除的節點 connectorId
+   */
+  private performNodeDeletion(nodeConnectorId: string) {
+    // 遞迴找出該節點和其所有子節點
     const nodesToRemove = this.getNodeAndChildren(nodeConnectorId);
 
-    // 從 GRAPH_DATA 中移除
+    // 從原始資料中移除所有相關節點
     nodesToRemove.forEach((nodeId) => {
       const index = GRAPH_DATA.findIndex((node) => node.id === nodeId);
       if (index !== -1) {
@@ -194,20 +261,36 @@ export class App implements OnInit {
       }
     });
 
-    // 保存到 localStorage
+    // 儲存到本地儲存
     this.saveGraphData();
 
-    // 重新計算佈局
+    // 重新計算並顯示新的佈局
     this._getData(new dagre.graphlib.Graph(), this.getCurrentDirection());
   }
 
+  /**
+   * 遞迴取得指定節點及其所有子孫節點的 ID 列表
+   * @param nodeId - 起始節點 ID
+   * @returns 包含該節點及其所有子孫節點的 ID 陣列
+   */
   private getNodeAndChildren(nodeId: string): string[] {
     const result = [nodeId];
+    // 找到該節點的直接子節點
     const children = GRAPH_DATA.filter((node) => node.parentId === nodeId);
+    // 遞迴處理每個子節點
     children.forEach((child) => {
       result.push(...this.getNodeAndChildren(child.id));
     });
     return result;
+  }
+
+  /**
+   * 檢查指定節點是否有直接子節點
+   * @param nodeId - 要檢查的節點 ID
+   * @returns 如果有子節點返回 true，否則返回 false
+   */
+  private hasChildNodes(nodeId: string): boolean {
+    return GRAPH_DATA.some((node) => node.parentId === nodeId);
   }
 
   private getCurrentDirection(): Direction {
@@ -220,6 +303,16 @@ export class App implements OnInit {
     if (event.key === 'Enter') {
       this.finishEdit();
     }
+  }
+
+  /**
+   * 判斷指定節點是否為根節點（沒有父節點）
+   * @param connectorId - 節點的 connectorId
+   * @returns 如果是根節點返回 true，否則返回 false
+   */
+  isRootNode(connectorId: string): boolean {
+    const nodeData = GRAPH_DATA.find((node) => node.id === connectorId);
+    return nodeData?.parentId === null;
   }
 
   fb = inject(FormBuilder);

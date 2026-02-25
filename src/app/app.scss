@@ -1,21 +1,21 @@
 .f-flow {
-  height: 600px;
+  height: 100vh;
   border: 1px solid rgba(60, 60, 67);
 }
 
 .f-node {
   padding: 10px;
-  color: #b7dd1f;
+  color: #56b8ff;
   text-align: center;
   background: white;
   border-radius: 40px;
-  border: 2px solid #b7dd1f;
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 10%);
+  border: 2px solid #56b8ff;
+  box-shadow: 0px 0px 3px #81c4f4;
   transition: max-height 0.2s cubic-bezier(0.5, 0.5, 0.7, 0.8);
 
   //被抓取的框會改色
   &.f-selected {
-    border-color: #b7dd1f;
+    border-color: #56b8ff;
     // Highlights the border when the node is selected
     // The f-selected class is automatically added by the library when a node or connection is selected.
   }
@@ -52,7 +52,7 @@
     &.f-selected {
       // 這是選種線後的顏色
       .f-connection-path {
-        stroke: #b7dd1f;
+        stroke: #56b8ff;
       }
     }
   }
@@ -85,8 +85,8 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 1px solid #b7dd1f;
-    color: #b7dd1f;
+    border: 1px solid #56b8ff;
+    color: #56b8ff;
     border-radius: 50%;
     background: white;
     box-shadow: 0px 0px 10px rgba(0, 0, 0, 10%);
@@ -105,6 +105,7 @@
   .node:hover .node__button-add,
   .node:hover .node__button-remove {
     opacity: 1;
+    margin-left: 30px;
     right: 5px;
     transform: rotate(0deg);
   }
