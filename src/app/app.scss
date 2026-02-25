@@ -1,0 +1,111 @@
+.f-flow {
+  height: 600px;
+  border: 1px solid rgba(60, 60, 67);
+}
+
+.f-node {
+  padding: 10px;
+  color: #b7dd1f;
+  text-align: center;
+  background: white;
+  border-radius: 40px;
+  border: 2px solid #b7dd1f;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 10%);
+  transition: max-height 0.2s cubic-bezier(0.5, 0.5, 0.7, 0.8);
+
+  //被抓取的框會改色
+  &.f-selected {
+    border-color: #b7dd1f;
+    // Highlights the border when the node is selected
+    // The f-selected class is automatically added by the library when a node or connection is selected.
+  }
+}
+
+.f-node:hover {
+  max-height: 1000px; /* 足够大的值来容纳内容 */
+}
+
+.f-drag-handle {
+  cursor: move;
+}
+
+::ng-deep {
+  .f-connection {
+    .f-connection-drag-handle {
+      fill: rgb(186, 186, 186);
+      // By default, this element has a black fill and is used to detect the start of dragging (e.g., onmousedown).
+      // We make it transparent to avoid visual clutter, while keeping it functional.
+    }
+
+    .f-connection-selection {
+      stroke-width: 10;
+      // This is a pseudo-connection (a copy of the main path) used to make it easier to select the connection.
+      // It's slightly thicker than the actual path (which is often only 1px), making it easier to interact with.
+      // It remains invisible to avoid affecting visual clarity but stays active for user interaction.
+    }
+
+    .f-connection-path {
+      stroke: rgb(186, 186, 186);
+      stroke-width: 2;
+    }
+
+    &.f-selected {
+      // 這是選種線後的顏色
+      .f-connection-path {
+        stroke: #b7dd1f;
+      }
+    }
+  }
+
+  .company {
+    &__title {
+      position: relative;
+      display: inline-block;
+      //   overflow: hidden;
+    }
+  }
+
+  .node__controls {
+    position: absolute;
+    top: 50%;
+    right: -40px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .node__button-add,
+  .node__button-remove {
+    opacity: 0;
+    right: 20px;
+    position: relative;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid #b7dd1f;
+    color: #b7dd1f;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 10%);
+
+    cursor: pointer;
+    transform: rotate(-720deg);
+    transition: all 0.5s cubic-bezier(0.075, 0.82, 0.165, 1);
+  }
+
+  .node__button-add:hover,
+  .node__button-remove:hover {
+    border-color: #007acc;
+    background: #f0f8ff;
+  }
+
+  .node:hover .node__button-add,
+  .node:hover .node__button-remove {
+    opacity: 1;
+    right: 5px;
+    transform: rotate(0deg);
+  }
+}
