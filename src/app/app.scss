@@ -1,6 +1,9 @@
 .f-flow {
   height: 100vh;
   border: 1px solid rgba(60, 60, 67);
+  background-image: url("../assets/dots-background.jpg");
+  background-size: contain;
+  background-repeat: repeat;
 }
 
 .f-node {
@@ -8,8 +11,8 @@
   color: #56b8ff;
   text-align: center;
   background: white;
-  border-radius: 40px;
-  border: 2px solid #56b8ff;
+  border-radius: 10px;
+  border: 1px solid #56b8ff;
   box-shadow: 0px 0px 3px #81c4f4;
   transition: max-height 0.2s cubic-bezier(0.5, 0.5, 0.7, 0.8);
 
@@ -26,7 +29,10 @@
 }
 
 .f-drag-handle {
-  cursor: move;
+  cursor: grab;
+}
+.f-drag-handle:active {
+  cursor: grabbing;
 }
 
 ::ng-deep {
@@ -45,7 +51,7 @@
     }
 
     .f-connection-path {
-      stroke: rgb(186, 186, 186);
+      stroke: #bababa;
       stroke-width: 2;
     }
 
@@ -60,7 +66,10 @@
   .company {
     &__title {
       position: relative;
-      display: inline-block;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+
       //   overflow: hidden;
     }
   }
@@ -75,17 +84,19 @@
     gap: 10px;
   }
 
-  .node__button-add,
+  .node__button-addUser,
+  .node__button-company,
   .node__button-remove {
     opacity: 0;
     right: 20px;
     position: relative;
+    font-size: 20px;
     width: 24px;
     height: 24px;
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 1px solid #56b8ff;
+    // border: 1px solid #56b8ff;
     color: #56b8ff;
     border-radius: 50%;
     background: white;
@@ -96,17 +107,23 @@
     transition: all 0.5s cubic-bezier(0.075, 0.82, 0.165, 1);
   }
 
-  .node__button-add:hover,
+  .node__button-addUser:hover,
+  .node__button-company:hover,
   .node__button-remove:hover {
     border-color: #007acc;
     background: #f0f8ff;
   }
 
-  .node:hover .node__button-add,
+  .node:hover .node__button-addUser,
+  .node:hover .node__button-company,
   .node:hover .node__button-remove {
     opacity: 1;
     margin-left: 30px;
     right: 5px;
     transform: rotate(0deg);
+  }
+
+  svg {
+    fill: #bababa;
   }
 }

@@ -6,12 +6,15 @@ import {
   model,
   viewChild,
   signal,
+  ViewChild,
+  ElementRef,
 } from '@angular/core';
 import {
   EFConnectableSide,
   FCanvasComponent,
   FFlowComponent,
   FFlowModule,
+  EFMarkerType,
 } from '@foblex/flow';
 import { IPoint } from '@foblex/2d';
 import {
@@ -31,7 +34,10 @@ interface INodeViewModel {
   id: string; // 視覺節點的唯一識別符（用於 Angular 追蹤）
   connectorId: string; // dagre 圖形庫使用的節點 ID（用於連線邏輯）
   position: IPoint; // 節點在畫布上的位置座標
-  title: string; // 節點顯示的標題文字
+  companyName: string; // 公司名稱
+  phoneNumber?: string; // 電話
+  address?: string; // 地址
+  manager?: string; // 負責人
   isEditing?: boolean; // 是否處於編輯模式（可選屬性）
 }
 
@@ -40,6 +46,15 @@ interface IConnectionViewModel {
   id: string; // 連線的唯一識別符
   from: string; // 起始節點的 connectorId
   to: string; // 目標節點的 connectorId
+}
+
+interface graphDataModel {
+  id: string;
+  parentId: string | null;
+  companyName?: string;
+  phoneNumber?: string;
+  address?: string;
+  manager?: string;
 }
 
 @Component({
@@ -71,6 +86,8 @@ export class App implements OnInit {
   isAutoLayout = model(true);
   // 是否啟用縮放功能
   isZoomEnabled = true;
+  // 將 EFMarkerType 重新命名為 EFM，方便在模板中使用
+  EFM = EFMarkerType;
 
   /**
    * 主要的圖形數據處理方法：負責整合 dagre 佈局計算與 UI 更新
@@ -102,8 +119,8 @@ export class App implements OnInit {
     graph.setGraph({ rankdir: direction });
     // 將所有節點資料加入到 dagre 圖形中
     GRAPH_DATA.forEach((node) => {
-      // 為每個節點設定 ID 和預設尺寸（寬120px，高73px）
-      graph.setNode(node.id, { width: 120, height: 73 });
+      // 為每個節點設定 ID 和預設尺寸（寬150px，高100px）
+      graph.setNode(node.id, { width: 150, height: 160 });
       // 如果節點有父節點，建立父子連線關係
       if (node.parentId != null) {
         graph.setEdge(node.parentId, node.id, {});
@@ -120,21 +137,22 @@ export class App implements OnInit {
    */
   _calculateNodes(graph: Graph) {
     return graph.nodes().map((x) => {
-      // 取得 dagre 計算後的節點位置和尺寸資訊
       const node = graph.node(x);
-      // 從原始資料中找到對應的節點，取得標題等額外資訊
       const graphData = GRAPH_DATA.find((gd) => gd.id === x);
       return {
-        id: generateGuid(), // 產生唯一的視覺 ID（供 Angular 追蹤）
-        connectorId: x, // dagre 節點 ID（用於連線邏輯）
-        position: { x: node.x, y: node.y }, // dagre 計算的最佳位置
-        title: graphData?.title || x, // 顯示標題（優先使用自訂標題）
-        isEditing: false, // 預設不在編輯模式
+        id: generateGuid(),
+        connectorId: x,
+        position: { x: node.x, y: node.y },
+        companyName: graphData?.companyName || '',
+        phoneNumber: graphData?.phoneNumber,
+        address: graphData?.address,
+        manager: graphData?.manager,
+        isEditing: false,
       };
     });
   }
 
-  private _calculateConnections(graph: Graph) {
+  _calculateConnections(graph: Graph) {
     return graph
       .edges()
       .map((x) => ({ id: generateGuid(), from: x.v, to: x.w }));
@@ -149,45 +167,115 @@ export class App implements OnInit {
   }
 
   //   =================================================
+  // ngModel 綁定的編輯狀態和欄位值
   editingNodeId = signal<string | null>(null);
-  editingNodeTitle = signal<string>('');
+  editingNodeCompanyName = signal<string>('');
+  editingNodePhoneNumber = signal<string>('');
+  editingNodeAddress = signal<string>('');
+  editingNodeManager = signal<string>('');
+
+  private finishEditTimeoutId: any = null;
 
   startEdit(nodeId: string) {
+    // 清除任何pending的結束編輯操作
+    if (this.finishEditTimeoutId) {
+      clearTimeout(this.finishEditTimeoutId);
+      this.finishEditTimeoutId = null;
+    }
+
     this.editingNodeId.set(nodeId);
-    // 找到節點並設定編輯的標題
     const node = this.nodes().find((n) => n.id === nodeId);
     if (node) {
-      this.editingNodeTitle.set(node.title);
+      this.editingNodeCompanyName.set(node.companyName);
+      this.editingNodePhoneNumber.set(node.phoneNumber || '');
+      this.editingNodeAddress.set(node.address || '');
+      this.editingNodeManager.set(node.manager || '');
+    }
+  }
+
+  // 延遲結束編輯，允許在輸入字段間切換
+  delayedFinishEdit() {
+    if (this.finishEditTimeoutId) {
+      clearTimeout(this.finishEditTimeoutId);
+    }
+
+    this.finishEditTimeoutId = setTimeout(() => {
+      this.finishEdit();
+    }, 100); // 100ms延遲
+  }
+
+  // 取消延遲的結束編輯操作
+  cancelFinishEdit() {
+    if (this.finishEditTimeoutId) {
+      clearTimeout(this.finishEditTimeoutId);
+      this.finishEditTimeoutId = null;
     }
   }
 
   finishEdit() {
-    this.updateNodeTitle();
+    if (this.finishEditTimeoutId) {
+      clearTimeout(this.finishEditTimeoutId);
+      this.finishEditTimeoutId = null;
+    }
+    this.updateNodeInfo();
     this.editingNodeId.set(null);
   }
 
-  updateNodeTitle() {
+  //   isNumber(value: string) {
+  //     /^\d+$/.test(value)
+  //       ? true
+  //       : window.alert('請輸入有效的電話號碼（僅限數字）');
+  //   }
+
+  updateNodeInfo() {
     const editingId = this.editingNodeId();
-    const newTitle = this.editingNodeTitle();
-    if (editingId && newTitle.trim()) {
-      // 更新節點標題
+    const newCompanyName = this.editingNodeCompanyName();
+    const newPhoneNumber = this.editingNodePhoneNumber();
+    const newAddress = this.editingNodeAddress();
+    const newManager = this.editingNodeManager();
+
+    if (editingId && newCompanyName.trim()) {
+      const node = this.nodes().find((n) => n.id === editingId);
+      const isUserNode = node?.connectorId.startsWith('User');
+
       this.nodes.update((nodes) =>
         nodes.map((node) =>
-          node.id === editingId ? { ...node, title: newTitle.trim() } : node,
+          node.id === editingId
+            ? isUserNode
+              ? {
+                  ...node,
+                  companyName: newCompanyName.trim(),
+                }
+              : {
+                  ...node,
+                  companyName: newCompanyName.trim(),
+                  phoneNumber: newPhoneNumber.trim(),
+                  address: newAddress.trim(),
+                  manager: newManager.trim(),
+                }
+            : node,
         ),
       );
-      // 同步更新 GRAPH_DATA
-      const node = this.nodes().find((n) => n.id === editingId);
+
       if (node) {
         const graphNodeIndex = GRAPH_DATA.findIndex(
           (gn) => gn.id === node.connectorId,
         );
         if (graphNodeIndex !== -1) {
-          GRAPH_DATA[graphNodeIndex] = {
-            ...GRAPH_DATA[graphNodeIndex],
-            title: newTitle.trim(),
-          };
-          // 保存到 localStorage
+          if (isUserNode) {
+            GRAPH_DATA[graphNodeIndex] = {
+              ...GRAPH_DATA[graphNodeIndex],
+              companyName: newCompanyName.trim(),
+            };
+          } else {
+            GRAPH_DATA[graphNodeIndex] = {
+              ...GRAPH_DATA[graphNodeIndex],
+              companyName: newCompanyName.trim(),
+              phoneNumber: newPhoneNumber.trim(),
+              address: newAddress.trim(),
+              manager: newManager.trim(),
+            };
+          }
           this.saveGraphData();
         }
       }
@@ -195,25 +283,35 @@ export class App implements OnInit {
   }
 
   /**
-   * 在指定父節點下新增子節點
-   * @param parentConnectorId - 父節點的 connectorId
+   * 在指定父節點下新增子節點（只有 title 欄位）
    */
   addChildNode(parentConnectorId: string) {
-    // 產生新節點的唯一 ID
-    const newNodeId = `Node${Date.now()}`;
+    const newNodeId = `User${Date.now()}`;
     const newNode = {
       id: newNodeId,
       parentId: parentConnectorId,
-      title: `New Node ${GRAPH_DATA.length + 1}`,
+      companyName: `新使用者 ${GRAPH_DATA.length + 1}`,
     };
-
-    // 將新節點加入到原始資料中
     GRAPH_DATA.push(newNode);
-
-    // 儲存到本地儲存
     this.saveGraphData();
+    this._getData(new dagre.graphlib.Graph(), this.getCurrentDirection());
+  }
 
-    // 重新計算並顯示新的佈局
+  /**
+   * 新增公司節點（含所有欄位）
+   */
+  addCompanyNode(parentConnectorId: string) {
+    const newNodeId = `Company${Date.now()}`;
+    const newNode = {
+      id: newNodeId,
+      parentId: parentConnectorId,
+      companyName: `新公司 ${GRAPH_DATA.length + 1}`,
+      phoneNumber: '',
+      address: '',
+      manager: '',
+    };
+    GRAPH_DATA.push(newNode);
+    this.saveGraphData();
     this._getData(new dagre.graphlib.Graph(), this.getCurrentDirection());
   }
 
@@ -249,7 +347,7 @@ export class App implements OnInit {
    * 執行實際的節點刪除操作
    * @param nodeConnectorId - 要刪除的節點 connectorId
    */
-  private performNodeDeletion(nodeConnectorId: string) {
+  performNodeDeletion(nodeConnectorId: string) {
     // 遞迴找出該節點和其所有子節點
     const nodesToRemove = this.getNodeAndChildren(nodeConnectorId);
 
@@ -273,7 +371,7 @@ export class App implements OnInit {
    * @param nodeId - 起始節點 ID
    * @returns 包含該節點及其所有子孫節點的 ID 陣列
    */
-  private getNodeAndChildren(nodeId: string): string[] {
+  getNodeAndChildren(nodeId: string): string[] {
     const result = [nodeId];
     // 找到該節點的直接子節點
     const children = GRAPH_DATA.filter((node) => node.parentId === nodeId);
@@ -289,11 +387,11 @@ export class App implements OnInit {
    * @param nodeId - 要檢查的節點 ID
    * @returns 如果有子節點返回 true，否則返回 false
    */
-  private hasChildNodes(nodeId: string): boolean {
+  hasChildNodes(nodeId: string): boolean {
     return GRAPH_DATA.some((node) => node.parentId === nodeId);
   }
 
-  private getCurrentDirection(): Direction {
+  getCurrentDirection(): Direction {
     return this.configuration().outputSide === EFConnectableSide.RIGHT
       ? Direction.LEFT_TO_RIGHT
       : Direction.TOP_TO_BOTTOM;
@@ -315,6 +413,28 @@ export class App implements OnInit {
     return nodeData?.parentId === null;
   }
 
+  /**
+   * 判斷指定節點是否為使用者節點（只顯示title）
+   * @param connectorId - 節點的 connectorId
+   * @returns 如果是使用者節點返回 true，否則返回 false
+   */
+  isUserNode(connectorId: string): boolean {
+    return connectorId.startsWith('User') || this.isRootNode(connectorId);
+  }
+
+  /**
+   * 檢查節點是否有有效的電話號碼可以顯示
+   * @param node - 節點物件
+   * @returns 如果有有效電話號碼返回 true，否則返回 false
+   */
+  shouldShowPhoneNumber(node: INodeViewModel): boolean {
+    return !!(
+      node.phoneNumber &&
+      node.phoneNumber.trim() !== '' &&
+      node.phoneNumber !== ''
+    );
+  }
+
   fb = inject(FormBuilder);
 
   formBuilder = this.fb.group({
@@ -334,7 +454,6 @@ export class App implements OnInit {
     try {
       const dataInfo = {
         formdata: val,
-        test: this.test,
       };
       localStorage.setItem('giveAName', JSON.stringify(dataInfo));
     } catch (e) {
@@ -353,7 +472,6 @@ export class App implements OnInit {
   loadInfo(): void {
     const saveData = localStorage.getItem(this.formBuilder.value.title || '');
     if (saveData) {
-      this.test = JSON.parse(saveData);
       this.formBuilder.patchValue({ title: this.formBuilder.value.title });
     }
   }
@@ -384,12 +502,6 @@ export class App implements OnInit {
       console.warn('Failed to load graph data:', e);
     }
   }
-
-  test = [
-    { id: 'node1', parentId: null },
-    { id: 'node2', parentId: 'node1' },
-    { id: 'node3', parentId: 'node1' },
-  ];
 }
 
 enum Direction {
@@ -408,20 +520,13 @@ const CONFIGURATION = {
   },
 };
 
-let GRAPH_DATA: Array<{
-  id: string;
-  parentId: string | null;
-  title?: string;
-}> = [
-  { id: 'Node1w13r', parentId: null, title: 'Root Node' },
-  { id: 'Node2', parentId: 'Node1w13r', title: 'Child Node 2' },
-  { id: 'Node3', parentId: 'Node1w13r', title: 'Child Node 3' },
-  { id: 'Node4', parentId: 'Node3', title: 'Child Node 4' },
-  { id: 'Node5', parentId: 'Node3', title: 'Child Node 5' },
-  { id: 'Node6', parentId: 'Node3', title: 'Child Node 6' },
-  { id: 'Node7', parentId: 'Node3', title: 'Child Node 7' },
-  { id: 'Node8', parentId: 'Node2', title: 'Child Node 8' },
-  { id: 'Node9', parentId: 'Node7', title: 'Child Node 9' },
-  { id: 'Node10', parentId: 'Node7', title: 'Child Node 10' },
-  { id: 'Node11', parentId: 'Node3', title: 'Child Node 11' },
+let GRAPH_DATA: Array<graphDataModel> = [
+  {
+    id: 'Node1w13r',
+    parentId: null,
+    companyName: 'Root Company',
+    phoneNumber: '',
+    address: '',
+    manager: '',
+  },
 ];

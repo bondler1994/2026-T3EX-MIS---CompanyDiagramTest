@@ -1,6 +1,5 @@
 <f-flow fDraggable>
   <f-canvas [fZoom]="isZoomEnabled">
-    <!-- test this shit -->
     @for(connection of connections(); track connection.id){
     <f-connection
       [fOffset]="4"
@@ -8,7 +7,8 @@
       [fInputId]="connection.to"
       fType="segment"
       fBehavior="fixed"
-    ></f-connection>
+    >
+    </f-connection>
     }@for(node of nodes();track node.id){
 
     <div
@@ -22,17 +22,72 @@
       (dblclick)="startEdit(node.id)"
       (click)="$event.stopPropagation()"
     >
-      @if(editingNodeId() === node.id){
+      @if(editingNodeId() === node.id){ @if((node.phoneNumber === undefined &&
+      node.address === undefined && node.manager === undefined) ||
+      isRootNode(node.connectorId)){
       <input
-        #editInput
-        [(ngModel)]="editingNodeTitle"
-        (blur)="finishEdit()"
+        #editCompanyName
+        [(ngModel)]="editingNodeCompanyName"
+        (blur)="delayedFinishEdit()"
+        (focus)="cancelFinishEdit()"
         (keydown)="onEditInputKeydown($event)"
-        class="border border-r-2 rounded-lg p-2"
+        class="border border-r-2 rounded-lg p-1"
       />
       } @else {
-      <span>{{ node.title }}</span>
-      }
+      <label for="editCompanyName">公司名稱</label>
+      <input
+        #editCompanyName
+        [(ngModel)]="editingNodeCompanyName"
+        (blur)="delayedFinishEdit()"
+        (focus)="cancelFinishEdit()"
+        (keydown)="onEditInputKeydown($event)"
+        class="border border-r-2 rounded-lg p-1"
+      />
+      <label for="editPhoneNumber">電話</label>
+      <input
+        #editPhoneNumber
+        [(ngModel)]="editingNodePhoneNumber"
+        (blur)="delayedFinishEdit()"
+        (focus)="cancelFinishEdit()"
+        (keydown)="onEditInputKeydown($event)"
+        class="border border-r-2 rounded-lg p-1"
+      />
+      <label for="editAddress">地址</label>
+      <input
+        #editAddress
+        [(ngModel)]="editingNodeAddress"
+        (blur)="delayedFinishEdit()"
+        (focus)="cancelFinishEdit()"
+        (keydown)="onEditInputKeydown($event)"
+        class="border border-r-2 rounded-lg p-1"
+      />
+      <label for="editManager">負責人</label>
+      <input
+        #editManager
+        [(ngModel)]="editingNodeManager"
+        (blur)="delayedFinishEdit()"
+        (focus)="cancelFinishEdit()"
+        (keydown)="onEditInputKeydown($event)"
+        class="border border-r-2 rounded-lg p-1"
+      />
+      } } @else { @if((node.phoneNumber === undefined && node.address ===
+      undefined && node.manager === undefined) || isRootNode(node.connectorId)){
+      <span>{{ node.companyName }}</span>
+      } @else {
+      <div class="flex flex-col items-start">
+        <div><label>公司：</label><span>{{ node.companyName }}</span></div>
+        <div><label>負責人：</label><span>{{ node.manager }}</span></div>
+        <div><label>電話：</label><span>{{ node.phoneNumber }}</span></div>
+        <div>
+          <label>地址：</label>
+          <span
+            class="leading-0 inline-flex max-w-[100px] overflow-hidden text-ellipsis whitespace-nowrap"
+          >
+            {{ node.address }}
+          </span>
+        </div>
+      </div>
+      } }
 
       <div
         fNodeOutput
@@ -43,19 +98,26 @@
 
       <div class="node__controls">
         <button
-          class="node__button-add"
+          class="node__button-addUser"
           (click)="addChildNode(node.connectorId); $event.stopPropagation()"
           title="Add child node"
         >
-          <span>+</span>
+          <span class=""><i class="fa-regular fa-circle-user"></i></span>
         </button>
         @if (!isRootNode(node.connectorId)) {
+        <button
+          class="node__button-company"
+          (click)="addCompanyNode(node.connectorId); $event.stopPropagation()"
+          title="Add company node"
+        >
+          <span><i class="fa-regular fa-copyright"></i></span>
+        </button>
         <button
           class="node__button-remove"
           (click)="removeNode(node.connectorId); $event.stopPropagation()"
           title="Remove node"
         >
-          <span>-</span>
+          <span><i class="fa-regular fa-circle-xmark"></i></span>
         </button>
         }
       </div>
